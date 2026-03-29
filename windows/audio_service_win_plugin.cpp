@@ -33,6 +33,16 @@ namespace audio_service_win
   void AudioServiceWinPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarWindows *registrar)
   {
+
+    static bool plugin_already_registered = false;
+
+    if (plugin_already_registered) {
+      // Skip registration in subwindow
+      return;
+    }
+
+    plugin_already_registered = true;
+
     channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), "audio_service_win",
         &flutter::StandardMethodCodec::GetInstance());
@@ -155,9 +165,29 @@ void AudioServiceWinPlugin::HandleMethodCall(
           arguments->find(flutter::EncodableValue("artist")) != arguments->end() &&
           arguments->find(flutter::EncodableValue("album")) != arguments->end())
       {
-        auto title = std::get<std::string>(arguments->at(flutter::EncodableValue("title")));
-        auto artist = std::get<std::string>(arguments->at(flutter::EncodableValue("artist")));
-        auto album = std::get<std::string>(arguments->at(flutter::EncodableValue("album")));
+        std::string title;
+        const auto &titleValue =
+            arguments->at(flutter::EncodableValue("title"));
+        if (!titleValue.IsNull() &&
+            std::holds_alternative<std::string>(titleValue)) {
+          title = std::get<std::string>(titleValue);
+        }
+
+        std::string artist;
+        const auto &artistValue =
+            arguments->at(flutter::EncodableValue("artist"));
+        if (!artistValue.IsNull() &&
+            std::holds_alternative<std::string>(artistValue)) {
+          artist = std::get<std::string>(artistValue);
+        }
+
+        std::string album;
+        const auto &albumValue =
+            arguments->at(flutter::EncodableValue("album"));
+        if (!albumValue.IsNull() &&
+            std::holds_alternative<std::string>(albumValue)) {
+          album = std::get<std::string>(albumValue);
+        }
 
         // Ensure SMTC is initialized
         if (!smtc)
