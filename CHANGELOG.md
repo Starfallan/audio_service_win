@@ -1,5 +1,5 @@
 ## 0.0.3
-* Local cover art support by @
+* Local cover art support by @GerryDush
 * Crash fixed by @AfalpHy - Null data handling
 
 ## 0.0.2
