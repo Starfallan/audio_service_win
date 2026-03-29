@@ -19,6 +19,10 @@
 #include <memory>
 #include <sstream>
 #include <iostream>
+#include <fstream>  // std::ifstream
+#include <vector>   // std::vector
+#include <iterator> // std::istreambuf_iterator
+#include <iomanip>
 
 static winrt::Windows::Media::Playback::MediaPlayer mediaPlayer{nullptr};
 static winrt::Windows::Media::SystemMediaTransportControls smtc{nullptr};
@@ -81,49 +85,49 @@ namespace audio_service_win
       std::cout << "SMTC initialized with appid: " << appId << std::endl;
 
       smtc.ButtonPressed([](auto const &, winrt::Windows::Media::SystemMediaTransportControlsButtonPressedEventArgs const &args)
-        {
-          std::string* method = new std::string;
-          switch (args.Button()) {
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Play:
-            *method = "play";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Pause:
-            *method = "pause";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Next:
-            *method = "next";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Previous:
-            *method = "previous";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Stop:
-            *method = "stop";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::FastForward:
-            *method = "fastForward";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Rewind:
-            *method = "rewind";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::Record:
-            *method = "record";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::ChannelUp:
-            *method = "channelUp";
-            break;
-          case winrt::Windows::Media::SystemMediaTransportControlsButton::ChannelDown:
-            *method = "channelDown";
-            break;
-          default:
-            *method = "other";
-            break;
-          }
-          channel->InvokeMethod(
-            "onSMTCButtonPressed",
-            std::make_unique<flutter::EncodableValue>(*method)
-          );
-          delete method; // Clean up the dynamically allocated string
-        });
+                         {
+                           std::string *method = new std::string;
+                           switch (args.Button())
+                           {
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Play:
+                             *method = "play";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Pause:
+                             *method = "pause";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Next:
+                             *method = "next";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Previous:
+                             *method = "previous";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Stop:
+                             *method = "stop";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::FastForward:
+                             *method = "fastForward";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Rewind:
+                             *method = "rewind";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::Record:
+                             *method = "record";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::ChannelUp:
+                             *method = "channelUp";
+                             break;
+                           case winrt::Windows::Media::SystemMediaTransportControlsButton::ChannelDown:
+                             *method = "channelDown";
+                             break;
+                           default:
+                             *method = "other";
+                             break;
+                           }
+                           channel->InvokeMethod(
+                               "onSMTCButtonPressed",
+                               std::make_unique<flutter::EncodableValue>(*method));
+                           delete method; // Clean up the dynamically allocated string
+                         });
     }
   }
 
@@ -132,7 +136,38 @@ namespace audio_service_win
 namespace audio_service_win
 {
 
-void AudioServiceWinPlugin::HandleMethodCall(
+  std::string UrlDecode(const std::string &encoded)
+  {
+    std::ostringstream result;
+    for (size_t i = 0; i < encoded.size(); ++i)
+    {
+      if (encoded[i] == '%' && i + 2 < encoded.size())
+      {
+        int value;
+        std::istringstream is(encoded.substr(i + 1, 2));
+        if (is >> std::hex >> value)
+        {
+          result << static_cast<char>(value);
+          i += 2;
+        }
+        else
+        {
+          result << encoded[i];
+        }
+      }
+      else if (encoded[i] == '+')
+      {
+        result << ' ';
+      }
+      else
+      {
+        result << encoded[i];
+      }
+    }
+    return result.str();
+  }
+
+  void AudioServiceWinPlugin::HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
   {
@@ -148,7 +183,6 @@ void AudioServiceWinPlugin::HandleMethodCall(
       {
         appId = std::get<std::string>(arguments->at(flutter::EncodableValue("appid")));
 
-        
         result->Success();
       }
       else
@@ -198,7 +232,7 @@ void AudioServiceWinPlugin::HandleMethodCall(
         std::string artUri;
         if (arguments->find(flutter::EncodableValue("artUri")) != arguments->end())
         {
-          const auto& artUriValue = arguments->at(flutter::EncodableValue("artUri"));
+          const auto &artUriValue = arguments->at(flutter::EncodableValue("artUri"));
           if (!artUriValue.IsNull() && std::holds_alternative<std::string>(artUriValue))
           {
             artUri = std::get<std::string>(artUriValue);
@@ -218,9 +252,30 @@ void AudioServiceWinPlugin::HandleMethodCall(
           {
             try
             {
-              winrt::Windows::Foundation::Uri uri(winrt::to_hstring(artUri));
-              auto thumbRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
-              updater.Thumbnail(thumbRef);
+
+              std::thread([artUri]()
+                          {
+              winrt::init_apartment(winrt::apartment_type::multi_threaded);
+              try {
+                  if (artUri.rfind("http://", 0) == 0 || artUri.rfind("https://", 0) == 0) {
+                      winrt::Windows::Foundation::Uri uri(winrt::to_hstring(artUri));
+                      auto thumbRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
+                      updater.Thumbnail(thumbRef);
+                  } else {
+                      std::string localPath = artUri;
+                      if (localPath.rfind("file://", 0) == 0) {
+                          localPath = localPath.substr(8);
+                          std::replace(localPath.begin(), localPath.end(), '/', '\\');
+                      }
+                      auto storageFile = winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(winrt::to_hstring(UrlDecode(localPath))).get();
+                      auto thumbRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromFile(storageFile);
+                      updater.Thumbnail(thumbRef);
+                  }
+                  updater.Update();
+              } catch (const winrt::hresult_error& e) {
+                  std::cerr << "Failed to set thumbnail: " << e.message().c_str() << std::endl;
+              } })
+                  .detach();
             }
             catch (...)
             {
@@ -237,7 +292,6 @@ void AudioServiceWinPlugin::HandleMethodCall(
         result->Error("InvalidArguments", "title, artist, and album are required");
       }
     }
-
 
     // Update State
     else if (method_call.method_name().compare("updateState") == 0)
