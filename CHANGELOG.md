@@ -1,3 +1,6 @@
+## 0.0.3
+* Crash fixed by @AfalpHy - Null data handling
+
 ## 0.0.2
 
 * Bug resolved for blank notification at start.

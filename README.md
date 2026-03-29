@@ -40,7 +40,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  audio_service_win: ^0.0.1
+  audio_service_win: ^0.0.3
 ```
 
 Then run:
