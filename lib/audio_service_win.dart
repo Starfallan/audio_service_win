@@ -33,11 +33,20 @@ class AudioServiceWin extends AudioServicePlatform {
   Future<void> setMediaItem(SetMediaItemRequest request) async {
     log('Set Media Item in AudioServiceWin.', name: 'audio_service_win');
 
+    final artCacheFile = request.mediaItem.extras?['artCacheFile'];
+    final artUri = request.mediaItem.artUri;
+    String? artUriString;
+    if (artCacheFile is String && artCacheFile.isNotEmpty) {
+      artUriString = artCacheFile;
+    } else if (artUri != null) {
+      artUriString = artUri.toString();
+    }
+
     await methodChannel.invokeMethod('setMediaItem', {
       'title': request.mediaItem.title,
       'artist': request.mediaItem.artist,
       'album': request.mediaItem.album,
-      'artUri': request.mediaItem.artUri.toString(),
+      'artUri': artUriString,
     });
   }
 
